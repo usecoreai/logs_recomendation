@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "client-log-analyzer"
+version = "0.0.0"
+description = "Client activity analyzer from service logs"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas",
+  "typer",
+]
+
+[project.scripts]
+client = "app.client:app"
+
+[tool.setuptools]
+packages = ["app"]
+
