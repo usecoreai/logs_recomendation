@@ -17,7 +17,7 @@ CLI-проект для анализа клиентской активности
 
 ```text
 Logs_analysis/
-  app/
+  logs_recomendation/
     client.py      # CLI (Typer)
     parser.py      # чтение и парсинг логов
     analyzer.py    # расчет аналитики клиента
@@ -27,7 +27,6 @@ Logs_analysis/
   all.log
   api_methods.log
   pyproject.toml
-  requirements.txt
   Dockerfile
   README.md
 ```
@@ -41,7 +40,6 @@ Logs_analysis/
 
 ```bash
 cd Logs_analysis
-python3 -m pip install -r requirements.txt
 python3 -m pip install -e .
 ```
 
@@ -66,15 +64,15 @@ client analyze \
 - `--client-phone` — телефон клиента (например `9160993434`, `+7 916 099 34 34`)
 - `--output` — папка для результатов
 
-Важно: папка `--output` создается автоматически, если ее нет.
+папка `--output` создается автоматически, если ее нет.
 
-## Docker (минимальный)
+## Docker
 
 Сборка образа:
 
 ```bash
 cd Logs_analysis
-docker build -t client-log-analyzer .
+docker build -t logs-recomendation .
 ```
 
 Запуск контейнера:
@@ -82,7 +80,7 @@ docker build -t client-log-analyzer .
 ```bash
 docker run --rm \
   -v "$(pwd):/app" \
-  client-log-analyzer analyze \
+  logs-recomendation analyze \
   --logs-dir /app \
   --client-phone 9160993434 \
   --output /app/output

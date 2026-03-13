@@ -2,7 +2,7 @@ import re
 
 import pandas as pd
 
-from app.utils import (
+from logs_recomendation.utils import (
     build_designer_recommendations,
     classify_client_type,
     svg_bar_chart,

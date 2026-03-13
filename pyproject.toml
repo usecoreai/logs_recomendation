@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "client-log-analyzer"
+name = "logs-recomendation"
 version = "0.0.0"
 description = "Client activity analyzer from service logs"
 readme = "README.md"
@@ -14,8 +14,8 @@ dependencies = [
 ]
 
 [project.scripts]
-client = "app.client:app"
+client = "logs_recomendation.client:app"
 
 [tool.setuptools]
-packages = ["app"]
+packages = ["logs_recomendation"]
 

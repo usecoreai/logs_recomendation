@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.utils import build_phone_regex, normalize_phone
+from logs_recomendation.utils import build_phone_regex, normalize_phone
 
 TS_RE = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})\s+(?P<rest>.*)$")
 MSG_RE = re.compile(r"^\[[^\]]+\]\s+\[[^\]]+\]\s+\[(?P<level>[^\]]+)\]\s*(?P<message>.*)$")

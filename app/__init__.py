@@ -1,2 +1,0 @@
-"""Client log analyzer package."""
-

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.models import OutputPaths
+from logs_recomendation.models import OutputPaths
 
 
 def _list_html(items: list[str]) -> str:

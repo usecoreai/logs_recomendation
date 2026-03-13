@@ -2,10 +2,10 @@ from pathlib import Path
 
 import typer
 
-from app.analyzer import analyze_client
-from app.parser import read_client_events
-from app.report import save_outputs
-from app.utils import normalize_phone
+from logs_recomendation.analyzer import analyze_client
+from logs_recomendation.parser import read_client_events
+from logs_recomendation.report import save_outputs
+from logs_recomendation.utils import normalize_phone
 
 app = typer.Typer(help="Аналитика клиента по логам")
 
