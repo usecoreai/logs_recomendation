@@ -126,7 +126,7 @@ docker run --rm \
 
 После `analyze-designer` в директории `--output` будут:
 
-- `report.json`
+- `<designer>_report.json` (например `user@mrdoors.ru_report.json`)
 - `designer_events.csv`
-- `report.html`
+- `<designer>_report.html`
 

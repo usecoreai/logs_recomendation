@@ -7,6 +7,14 @@ import pandas as pd
 from logs_recomendation.models import OutputPaths
 
 
+def _designer_report_stem(designer_name: str) -> str:
+    """Безопасный префикс имени файла из designer_name (для *_report.json / *_report.html)."""
+    s = (designer_name or "designer").strip()
+    for bad in ("/", "\\", "\0"):
+        s = s.replace(bad, "_")
+    return s or "designer"
+
+
 def _list_html(items: list[str]) -> str:
     if not items:
         return "<p>Нет данных</p>"
@@ -195,11 +203,12 @@ def save_outputs(output_dir: Path, report: dict, events_df: pd.DataFrame, charts
 def save_outputs_designer(
     output_dir: Path, report: dict, events_df: pd.DataFrame, charts: dict
 ) -> OutputPaths:
-    """Сохраняет отчёт по дизайнеру: report.json, designer_events.csv, report.html."""
+    """Сохраняет отчёт по дизайнеру: <designer>_report.json, designer_events.csv, <designer>_report.html."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "report.json"
+    stem = _designer_report_stem(str(report.get("designer_name", "")))
+    json_path = output_dir / f"{stem}_report.json"
     csv_path = output_dir / "designer_events.csv"
-    html_path = output_dir / "report.html"
+    html_path = output_dir / f"{stem}_report.html"
 
     with json_path.open("w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)

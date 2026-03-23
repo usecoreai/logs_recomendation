@@ -9,6 +9,7 @@ from logs_recomendation.utils import build_phone_regex, normalize_phone
 TS_RE = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})\s+(?P<rest>.*)$")
 MSG_RE = re.compile(r"^\[[^\]]+\]\s+\[[^\]]+\]\s+\[(?P<level>[^\]]+)\]\s*(?P<message>.*)$")
 HTTP_RE = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+(\S+)")
+STAFF_PATH_RE = re.compile(r"/prod/([^/\s]+)/")
 
 
 def parse_line(line: str) -> dict:
@@ -144,4 +145,37 @@ def read_designer_events(logs_dir: Path, designer_name: str) -> pd.DataFrame:
     df = df.sort_values("timestamp", na_position="last").reset_index(drop=True)
     df["date"] = df["timestamp"].dt.strftime("%Y-%m-%d")
     return df
+
+
+def collect_designers(logs_dir: Path) -> list[str]:
+    """Собирает уникальные имена дизайнеров из JSON user и пути /prod/<designer>/..."""
+    log_files = sorted(logs_dir.rglob("*.log"))
+    if not log_files:
+        raise FileNotFoundError(f"No .log files found in {logs_dir}")
+
+    designers = set()
+    for log_file in log_files:
+        try:
+            with log_file.open("r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line_stripped = line.strip()
+                    if not line_stripped:
+                        continue
+
+                    if line_stripped.startswith("{"):
+                        try:
+                            data = json.loads(line_stripped)
+                            user = str(data.get("user") or "").strip()
+                            if user:
+                                designers.add(user)
+                        except json.JSONDecodeError:
+                            pass
+
+                    staff_match = STAFF_PATH_RE.search(line)
+                    if staff_match:
+                        designers.add(staff_match.group(1).strip())
+        except OSError as exc:
+            print(f"Warning: failed to read {log_file}: {exc}")
+
+    return sorted(d for d in designers if d)
 
