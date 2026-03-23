@@ -4,6 +4,7 @@ import pandas as pd
 
 from logs_recomendation.utils import (
     build_designer_recommendations,
+    build_designer_self_recommendations,
     classify_client_type,
     svg_bar_chart,
     svg_timeline_chart,
@@ -14,6 +15,10 @@ REQUEST_ID_RE = re.compile(r"\[REQUEST\s*#(\d+)\]")
 RETRIEVAL_FAIL_RE = re.compile(r"Retrieved data:\s*0/\d+", re.IGNORECASE)
 USERNAME_RE = re.compile(r"username=([^\s,]+)")
 STAFF_PATH_RE = re.compile(r"/prod/([^/\s]+)/")
+# Телефон в JSON: "telephone": "+79991234567" или "phone": "999-169-21-40"
+TELEPHONE_JSON_RE = re.compile(r'"telephone"\s*:\s*"([^"]+)"', re.IGNORECASE)
+PHONE_JSON_RE = re.compile(r'"phone"\s*:\s*"([^"]+)"', re.IGNORECASE)
+PHONE_10_DIGITS_RE = re.compile(r"\b(\d{10})\b")
 
 
 def _collect_staff_counts(df: pd.DataFrame) -> dict:
@@ -31,6 +36,22 @@ def _collect_staff_counts(df: pd.DataFrame) -> dict:
         for staff in hits:
             staff_counts[staff] = staff_counts.get(staff, 0) + 1
     return staff_counts
+
+
+def _collect_client_phones_from_df(df: pd.DataFrame) -> set[str]:
+    """Извлекает уникальные номера телефонов клиентов из raw_line (JSON и текст)."""
+    phones = set()
+    for raw in df["raw_line"].fillna("").astype(str):
+        for re_pat in (TELEPHONE_JSON_RE, PHONE_JSON_RE):
+            for m in re_pat.finditer(raw):
+                digits = re.sub(r"\D", "", m.group(1))
+                if len(digits) == 11 and digits[0] in ("7", "8"):
+                    digits = digits[1:]
+                if len(digits) == 10:
+                    phones.add(digits)
+        for m in PHONE_10_DIGITS_RE.finditer(raw):
+            phones.add(m.group(1))
+    return phones
 
 
 def analyze_client(df: pd.DataFrame, client_phone: str) -> tuple[dict, dict]:
@@ -121,5 +142,125 @@ def analyze_client(df: pd.DataFrame, client_phone: str) -> tuple[dict, dict]:
             {"первичный день": 1 if len(events_per_day) > 0 else 0, "повторные дни": repeat_days_count},
         ),
     }
+    return report, charts
+
+
+def analyze_designer(df: pd.DataFrame, designer_name: str) -> tuple[dict, dict]:
+    """Анализ активности дизайнера по логам: метрики и графики по тому же принципу, что и для клиента."""
+    events_per_day = (
+        df[df["date"].notna()].groupby("date").size().sort_index().astype(int).to_dict()
+        if not df.empty and df["date"].notna().any()
+        else {}
+    )
+
+    form_ids = set()
+    accepted_request_ids = set()
+    completed_request_ids = set()
+    for msg in df["message"].dropna().astype(str):
+        form_ids.update(STATUS_FORM_ID_RE.findall(msg))
+        rid_match = REQUEST_ID_RE.search(msg)
+        if rid_match:
+            rid = rid_match.group(1)
+            form_ids.add(rid)
+            low = msg.lower()
+            if "accepted form/presentator" in low:
+                accepted_request_ids.add(rid)
+            if "pipeline completed" in low:
+                completed_request_ids.add(rid)
+
+    messages = df["message"].fillna("").astype(str)
+    lower = messages.str.lower()
+    retrieval_failures = int(messages.str.contains(RETRIEVAL_FAIL_RE).sum())
+    timeouts_count = int(
+        (
+            lower.str.contains("timeout")
+            & ~lower.str.contains("default timeout")
+            & ~lower.str.contains("with timeout")
+        ).sum()
+    )
+    uploads_count = int(lower.str.contains(r"/records/upload|post /records/upload|\bupload\b").sum())
+
+    client_phones = _collect_client_phones_from_df(df)
+    clients_count = len(client_phones)
+
+    valid_ts = df["timestamp"].dropna().sort_values()
+    first_seen = valid_ts.min().isoformat() if len(valid_ts) else None
+    last_seen = valid_ts.max().isoformat() if len(valid_ts) else None
+    sessions_count = (
+        int((valid_ts.diff().dropna().dt.total_seconds() > 1800).sum() + 1)
+        if len(valid_ts) >= 2
+        else int(len(valid_ts) == 1)
+    )
+
+    forms_created_count = len(accepted_request_ids) if accepted_request_ids else len(form_ids)
+    pipeline_completed_count = int(lower.str.contains("pipeline completed").sum())
+    forms_completed_count = (
+        len(completed_request_ids) if completed_request_ids else pipeline_completed_count
+    )
+    forms_completed_count = (
+        min(forms_completed_count, forms_created_count) if forms_created_count else forms_completed_count
+    )
+    forms_not_completed_count = max(forms_created_count - forms_completed_count, 0)
+
+    issues_count = (
+        int(lower.str.contains(r"error|exception|traceback|failed|timeout", regex=True).sum())
+        + retrieval_failures
+    )
+    repeat_days_count = max(len(events_per_day) - 1, 0)
+
+    report = {
+        "designer_name": designer_name,
+        "first_seen": first_seen,
+        "last_seen": last_seen,
+        "total_events": int(len(df)),
+        "active_days_count": int(len(events_per_day)),
+        "forms_created_count": int(forms_created_count),
+        "forms_completed_count": int(forms_completed_count),
+        "forms_not_completed_count": int(forms_not_completed_count),
+        "uploads_count": int(uploads_count),
+        "clients_count": int(clients_count),
+        "issues_count": int(issues_count),
+        "events_per_day": events_per_day,
+        "sessions_count": int(sessions_count),
+        "repeat_days_count": int(repeat_days_count),
+        "designer_recommendations": [],
+    }
+    report["designer_recommendations"] = build_designer_self_recommendations(report)
+
+    charts = {
+        "timeline": svg_timeline_chart("timeline событий", list(valid_ts)),
+        "activity_by_day": svg_bar_chart("активность по дням", events_per_day),
+        "forms_state": svg_bar_chart(
+            "состояние заявок дизайнера",
+            {
+                "создано": forms_created_count,
+                "завершено": forms_completed_count,
+                "не завершено": forms_not_completed_count,
+            },
+        ),
+        "success_vs_issues": svg_bar_chart(
+            "успешные и проблемные обработки",
+            {"успешные": forms_completed_count, "проблемные": issues_count},
+        ),
+        "repeat_activity": svg_bar_chart(
+            "повторная активность",
+            {
+                "первичный день": 1 if len(events_per_day) > 0 else 0,
+                "повторные дни": repeat_days_count,
+            },
+        ),
+    }
+    if client_phones:
+        clients_activity = {p: 0 for p in sorted(client_phones)}
+        for raw in df["raw_line"].fillna("").astype(str):
+            for p in client_phones:
+                if p in re.sub(r"\D", "", raw) or p in raw:
+                    clients_activity[p] = clients_activity.get(p, 0) + 1
+        charts["clients_activity"] = svg_bar_chart(
+            "активность по клиентам (телефоны)", clients_activity
+        )
+    else:
+        charts["clients_activity"] = svg_bar_chart("активность по клиентам", {})
+
     return report, charts
 

@@ -46,6 +46,24 @@ def build_designer_recommendations(report: dict) -> list[str]:
     return tips
 
 
+def build_designer_self_recommendations(report: dict) -> list[str]:
+    """Рекомендации для отчёта по дизайнеру (самому себе)."""
+    tips = []
+    if report.get("clients_count", 0) > 0:
+        tips.append(f"По логам вы работали с {report['clients_count']} клиентом/клиентами.")
+    if report.get("forms_created_count", 0) > 0:
+        tips.append("Созданы заявки: проверьте, что все доведены до результата.")
+    if report.get("forms_not_completed_count", 0) > 0:
+        tips.append("Есть незавершённые заявки: стоит уточнить статус у клиентов.")
+    if report.get("issues_count", 0) > 0:
+        tips.append("В логах были ошибки при ваших запросах: при необходимости проверьте статус вручную.")
+    if report.get("active_days_count", 0) >= 2:
+        tips.append("Активность в несколько дней: можно подвести итоги по обработанным клиентам.")
+    if not tips:
+        tips.append("По логам активность минимальная. Отчёт собран по имени дизайнера.")
+    return tips
+
+
 def svg_wrap(title: str, body: str, width: int = 760, height: int = 240) -> str:
     return (
         f'<svg viewBox="0 0 {width} {height}" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">'
